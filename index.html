@@ -1,0 +1,116 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Dashboard</title>
+    <style>
+        #hchart {
+            width: 800px;
+            height: 500px;
+            border: 1px solid #bbb
+        }
+    </style>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script src="http://code.highcharts.com/highcharts.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.js"></script>
+    <script>
+        var socket = io('http://127.0.0.1');
+        var hchart = null;
+        socket.on('completeData', function (data) {
+            document.getElementById('complete-data').innerHTML = JSON.stringify(data);
+            var series = {};
+            series.name = 'KPI';
+            series.data = [];
+            Object.keys(data).sort().forEach(function (key) {
+                if (data.hasOwnProperty(key)) {
+                    var point = {};
+                    point.x = parseFloat(key);
+                    point.y = parseFloat(data[key].value);
+                    console.log(point);
+                    series.data.push(point);
+                }
+            });
+            $('#hchart').highcharts({
+                chart: {
+                    type: 'spline',
+                    animation: Highcharts.svg, // don't animate in old IE
+                    marginRight: 10,
+                    events: {
+                        load: function () {
+                            hchart = this;
+                        }
+                    }
+                },
+                colors: ['#7cb5ec', '#ff8528', '#90ed7d', '#f7a35c', '#8085e9',
+                    '#f15c80', '#e4d354', '#8085e8', '#8d4653', '#91e8e1'],
+                title: {
+                    text: 'Example'
+                },
+                xAxis: {
+                    type: 'datetime',
+                    tickPixelInterval: 150
+                },
+                yAxis: {
+                    title: {
+                        text: 'Value'
+                    },
+                    plotLines: [{
+                        value: 0,
+                        width: 1,
+                        color: '#808080'
+                    }]
+                },
+                tooltip: {
+                    formatter: function () {
+                        return '<b>' + this.series.name + '</b><br/>' +
+                            Highcharts.dateFormat('%Y-%m-%d %H:%M:%S', this.x) + '<br/>' +
+                            Highcharts.numberFormat(this.y, 2);
+                    }
+                },
+                legend: {
+                    enabled: true
+                },
+                exporting: {
+                    enabled: false
+                },
+                series: [series],
+                credits: {
+                    enabled: false
+                }
+            });
+        });
+        
+        socket.on('dataUpdate', function (data) {
+            document.getElementById('updated-data').innerHTML += JSON.stringify(data) + "\n";
+            var series = hchart.series[0].data;
+            for (var key in data) {
+                if (data.hasOwnProperty(key)) {
+                    var bOld = false;
+                    for (var i = 0; i < series.length; i++) {
+                        if (series[i].x === key) {
+                            bOld = true;
+                            series[i].update(data[key].value);
+                            break;
+                        }
+                    }
+                    if (!bOld) {
+                        console.log('new point');
+                        hchart.series[0].addPoint([parseInt(key), parseFloat(data[key].value)], true, true);
+                    }
+                }
+            }
+        });
+    </script>
+  </head>
+
+  <body>
+    <h1>Real-time Dashboard</h1>
+    <div id='hchart'></div>
+    
+    <h2>Initial Data</h2>
+    <pre id='complete-data'></pre><br/>
+    
+    <h2>Data Updates</h2>
+    <pre id='updated-data'></pre>
+  </body>
+</html>
